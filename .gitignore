@@ -1,0 +1,22 @@
+# RStudio files and caches
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+
+# Generated output files
+outputs/
+*.png
+*.gif
+archived_plots/
+archived_animations/
+
+# Large binary cache files
+*.Rdata
+*.rda
+
+# OS and editor files
+.DS_Store
+.vscode/
+*.swp
+*.swo

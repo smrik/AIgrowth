@@ -1,0 +1,296 @@
+---
+title: "Visualisation"
+author: "smrik"
+date: "2025-11-15"
+output: html_document
+---
+
+# Moore's Law
+
+```{r setup, include=FALSE}
+library(readr)
+library(tidyverse)
+library(ggthemes)
+library(ggrepel)
+library(readxl)
+theme_set(ggthemes::theme_fivethirtyeight(base_size = 14))
+tableau_colors <- ggthemes_data[["tableau"]][["color-palettes"]][["regular"]][["Tableau 10"]]
+tableau <- setNames(tableau_colors$value, tableau_colors$name)
+```
+
+## Data Loading
+
+```{r data}
+moore <- read_excel("moore.xlsx", sheet = "transistors", 
+    col_types = c("text", "numeric", "numeric", 
+        "text", "text", "text", "text"))
+
+moore$Yearnum <- moore$Year
+moore$Year <- as.Date(paste0(moore$Year, "-01-01"))
+moore$t_count <- moore$`Transistor count`
+moore$t_log <- log10(moore$`Transistor count`)
+
+View(moore)
+```
+
+```{r ggplot}
+
+# Fit linear model
+lm_model <- lm(t_log ~ Year, data = moore)
+
+min_x <- min(moore$Year)
+max_x <- max(moore$Year)
+min_y <- min(moore$t_count, na.rm = TRUE)
+max_y <- max(moore$t_count, na.rm = TRUE)
+
+# Create prediction data for trend line
+pred_data <- data.frame(
+  Year = seq(min_x, max_x, by = 30)
+)
+pred_data$t_log <- predict(lm_model, newdata = pred_data)
+pred_data$t_count <- 10^pred_data$t_log
+pred_data$date <- as.Date(paste0(pred_data$Year, "-01-01"), format = "%Y-%m-%d")
+
+# Calculate growth rate from slope
+slope <- coef(lm_model)[2]
+growth_per_year <- 10^slope  # This gives the multiplication factor per year
+
+cpu_cagr = ((max_y/min_y)^(1/(max(moore$Yearnum)-min(moore$Yearnum)))-1)*100
+print(cpu_cagr)
+
+# Create the plot
+plot <- ggplot() +
+  # Add all model points with lower alpha
+  geom_point(data = moore,
+             aes(x = Year, y = t_count),
+             color = tableau["Blue"],
+             alpha = 0.4,
+             size = 3) +
+  # Add trend line
+  geom_line(data = pred_data,
+            aes(x = date, y = t_count),
+            color = tableau["Blue"],
+            size = 1.2) +
+  # Add labels using ggrepel for automatic positioning
+  # Add trend line annotation
+  # Scales
+  scale_y_log10(
+    breaks = 10^seq(floor(log10(min_y)), ceiling(log10(max_y)), by=1),
+    labels = scales::trans_format("log10", scales::math_format(10^.x)),
+    limits = c(floor(min_y), ceiling(max_y))
+  ) +
+  scale_x_date(
+    breaks = seq(as.Date(min_x), as.Date(max_x), by = "5 years"),
+    date_labels = "%Y",
+    limits = c(as.Date(min_x), as.Date(max_x))
+  ) +
+  # Labels
+  labs(
+    x = "Year",
+    y = "Transisor counts",
+    title = "Transistor counts in CPUs seem to be following Moore's Law and
+doubling nearly every 2 years, as forecasted",
+    subtitle = paste0("Implied CAGR: 39.53%"),
+    caption = "Source: Wikipedia"
+  ) +
+  scale_colour_tableau() +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(face = "bold", size = 20),
+    plot.subtitle = element_text(margin = margin(b = 6), size = 12, color = "#999999"),
+    plot.caption = element_text(hjust = 0, size = 10, color = "#666666"),
+    axis.title.x = element_text(size = 12),
+    axis.title.y = element_text(size = 12)
+  )
+
+print(plot)
+
+# Save the plot
+ggsave(
+  "moore.png",
+  plot,
+  width = 11,
+  height = 6,
+  dpi = 300
+)
+
+
+```
+
+## GPUs
+
+## Data Loading
+
+```{r data}
+gpu <- read_excel("moore.xlsx", sheet = "GPUs")
+
+gpu$Yearnum <- gpu$Year
+
+gpu$Year <- as.Date(paste0(gpu$Year, "-01-01"))
+gpu$t_count <- gpu$`Transistor count`
+gpu$t_log <- log10(gpu$`Transistor count`)
+
+gpu$desi <- ifelse(gpu$`Designer(s)` %in% c("Nvidia", "AMD"), gpu$`Designer(s)`, "others")
+gpu$manu <- ifelse(gpu$`Fab(s)` %in% c("TSMC"), gpu$`Fab(s)`, "others")
+# Create a new column for alpha based on 'desi'
+gpu$alpha_value <- ifelse(gpu$desi == "others", 0.7, 0.7) # Lower alpha for "others"
+gpu$shape_value <- ifelse(gpu$desi == "others", 21, 21) # Lower size "others"
+
+View(gpu)
+```
+
+```{r ggplot}
+
+# Fit linear model
+lm_model <- lm(t_log ~ Year, data = gpu)
+
+min_x <- min(gpu$Year)
+max_x <- max(gpu$Year)
+min_y <- min(gpu$t_count, na.rm = TRUE)
+max_y <- max(gpu$t_count, na.rm = TRUE)
+
+# Create prediction data for trend line
+pred_data <- data.frame(
+  Year = seq(min_x, max_x, by = 30)
+)
+pred_data$t_log <- predict(lm_model, newdata = pred_data)
+pred_data$t_count <- 10^pred_data$t_log
+pred_data$date <- as.Date(paste0(pred_data$Year, "-01-01"), format = "%Y-%m-%d")
+
+# Calculate growth rate from slope
+slope <- coef(lm_model)[2]
+growth_per_year <- 10^slope  # This gives the multiplication factor per year
+
+growth_rate_percent <- (10^slope - 1) * 100
+print(growth_rate_percent*365)  # % growth per year
+
+gpu_cagr = ((max_y/min_y)^(1/(max(gpu$Yearnum)-min(gpu$Yearnum)))-1)*100
+print(gpu_cagr)
+
+plot_gpu <- ggplot() +
+  geom_point(
+    data = gpu,
+    aes(x = Year, y = t_count, color = desi, fill = desi, shape = desi),
+    size = 3,
+    stroke = 1.2
+  ) +
+  geom_line(
+    data = pred_data,
+    aes(x = date, y = t_count),
+    color = tableau["Blue"],
+    size = 1.2
+  )+
+  scale_shape_manual(values = c("Nvidia" = 21, "AMD" = 21, "others" = 21)) +
+  scale_fill_manual(values = c("Nvidia" = NA, "AMD" = NA, "others" = NA)) +
+  scale_color_manual(values = c("Nvidia" = "#59A14F", "AMD" = "#F28E2B", "others" = "#BAB0AC")) +
+  scale_y_log10(
+    breaks = 10^seq(floor(log10(min_y)), ceiling(log10(max_y)), by=1),
+    labels = scales::trans_format("log10", scales::math_format(10^.x)),
+    limits = c(floor(min_y), ceiling(max_y))
+  ) +
+  scale_x_date(
+    breaks = seq(as.Date(min_x), as.Date(max_x), by = "5 years"),
+    date_labels = "%Y",
+    limits = c(as.Date(min_x), as.Date(max_x))
+  ) +
+  labs(
+    x = "Year",
+    y = "Transistor counts",
+    title = "Transistor counts in GPUs are growing faster than Moore's Law
+would predict and the GPU market is dominated by Nvidia and AMD",
+    subtitle = paste0("Implied CAGR: 45.44%, exceeding Moore's Law by a small amount"),
+    caption = "Source: Wikipedia",
+    color = "GPU designer", fill = "GPU designer", shape = "GPU designer"
+  ) +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_text(size = 12),
+    plot.title = element_text(face = "bold", size = 20),
+    plot.subtitle = element_text(margin = margin(b = 6), size = 12, color = "#999999"),
+    plot.caption = element_text(hjust = 0, size = 10, color = "#666666"),
+    axis.title.x = element_text(size = 12),
+    axis.title.y = element_text(size = 12)
+  ) + scale_fill_manual(values = c("Nvidia" = "#59A14F", "AMD" = "#F28E2B", "others" = rgb(1,1,1,alpha=0)))
+
+
+print(plot_gpu)
+
+# Save the plot
+ggsave(
+  "gpu.png",
+  plot_gpu,
+  width = 11,
+  height = 6,
+  dpi = 300
+)
+
+
+
+#
+#
+#
+plot_tsmc <- ggplot() +
+  geom_point(
+    data = gpu,
+    aes(x = Year, y = t_count, color = manu, fill = manu, shape = manu),
+    size = 3,
+    stroke = 1.2
+  ) +
+  geom_line(
+    data = pred_data,
+    aes(x = date, y = t_count),
+    color = tableau["Blue"],
+    size = 1.2
+  )+
+  scale_shape_manual(values = c("TSMC" = 21, "others" = 21)) +
+  scale_fill_manual(values = c("TSMC" = NA, "others" = NA)) +
+  scale_color_manual(values = c("TSMC" = "#F28E2B", "others" = "#BAB0AC")) +
+  scale_y_log10(
+    breaks = 10^seq(floor(log10(min_y)), ceiling(log10(max_y)), by=1),
+    labels = scales::trans_format("log10", scales::math_format(10^.x)),
+    limits = c(floor(min_y), ceiling(max_y))
+  ) +
+  scale_x_date(
+    breaks = seq(as.Date(min_x), as.Date(max_x), by = "5 years"),
+    date_labels = "%Y",
+    limits = c(as.Date(min_x), as.Date(max_x))
+  ) +
+  labs(
+    x = "Year",
+    y = "Transistor counts",
+    title = "If we look at the manufacturer of the semiconductors, the market
+concentration is even higher and dominated by TSMC",
+    subtitle = paste0("Implied CAGR: 45.44%, exceeding Moore's Law by a small amount"),
+    caption = "Source: Wikipedia",
+    color = "GPU manufacturer", fill = "GPU manufacturer", shape = "GPU manufacturer"
+  ) +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_text(size = 12),
+    plot.title = element_text(face = "bold", size = 20),
+    plot.subtitle = element_text(margin = margin(b = 6), size = 12, color = "#999999"),
+    plot.caption = element_text(hjust = 0, size = 10, color = "#666666"),
+    axis.title.x = element_text(size = 12),
+    axis.title.y = element_text(size = 12)
+  ) + scale_fill_manual(values = c("TSMC" = "#F28E2B", "others" = rgb(1,1,1,alpha=0)))
+
+
+print(plot_tsmc)
+
+tableau["Orange"]
+tableau["Green"]
+
+
+# Save the plot
+ggsave(
+  "gpu_tsmc.png",
+  plot_tsmc,
+  width = 11,
+  height = 6,
+  dpi = 300
+)
+
+
+
+
+```
