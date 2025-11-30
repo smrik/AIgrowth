@@ -9,6 +9,8 @@
 # Usage:
 #   source("generate_all_plots.R")
 
+setwd("C:/Patrik's Vault/Patrik's Vault/Blog/Blog files/AIgrowth")
+
 cat("\n")
 cat("╔════════════════════════════════════════════════════════════════════╗\n")
 cat("║         AIgrowth: AI Compute Growth Visualizations                ║\n")
